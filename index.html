@@ -28,7 +28,7 @@
         body {
             background-color: var(--bg-main);
             display: flex;
-            justify-center: center;
+            justify-content: center;
             align-items: center;
             height: 100vh;
             color: var(--text-main);
@@ -97,7 +97,6 @@
             background-color: #fafafa;
         }
 
-        /* Scrollbar customizado */
         #chat-box::-webkit-scrollbar {
             width: 6px;
         }
@@ -112,7 +111,6 @@
             flex-direction: column;
             max-width: 75%;
             position: relative;
-            group: hover;
         }
 
         .wrapper-msg.sent {
@@ -146,7 +144,6 @@
             border-bottom-left-radius: 4px;
         }
 
-        /* Sub-mecanismo visual de Citação/Resposta dentro do balão */
         .reply-quoted-card {
             font-size: 0.8rem;
             padding: 6px 10px;
@@ -163,7 +160,6 @@
             color: #f1f5f9;
         }
 
-        /* Botão Oculto de Responder (Aparece ao passar o mouse) */
         .reply-action-btn {
             position: absolute;
             top: 50%;
@@ -199,7 +195,7 @@
             color: var(--primary);
         }
 
-        /* Container de Input e Pré-visualização de Resposta */
+        /* Container de Input e Resposta */
         .input-container {
             border-top: 1px solid #f1f5f9;
             background: var(--bg-chat);
@@ -208,7 +204,6 @@
             flex-direction: column;
         }
 
-        /* Barra de visualização de quem está sendo respondido */
         #reply-preview-bar {
             display: none;
             background: #f1f5f9;
@@ -239,7 +234,6 @@
             font-size: 1.1rem;
         }
 
-        /* Área do Input Real */
         .input-wrapper {
             display: flex;
             align-items: center;
@@ -280,6 +274,23 @@
             background-color: var(--primary-hover);
         }
 
+        .auth-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 16px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: background 0.2s ease;
+            width: 100%;
+        }
+
+        .auth-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }
@@ -292,12 +303,21 @@
         <div id="header">
             <div class="room-info">
                 <h2>Sala de Conversa</h2>
-                <p>Criptografada via ID de Sessão</p>
+                <p>Identificação via Google Auth</p>
             </div>
-            <button id="share-btn" onclick="copyLink()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                Convidar Alguém
-            </button>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <div id="user-profile" style="display: none; align-items: center; gap: 10px;">
+                    <img id="user-avatar" src="" alt="Avatar" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--primary);">
+                    <div style="display: flex; flex-direction: column;">
+                        <span id="user-name" style="font-size: 0.85rem; font-weight: 600;"></span>
+                        <button id="logout-btn" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.75rem; text-align: left; padding: 0; font-weight: 500;">Sair</button>
+                    </div>
+                </div>
+                <button id="share-btn" onclick="copyLink()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                    Convidar Alguém
+                </button>
+            </div>
         </div>
 
         <div id="chat-box"></div>
@@ -310,9 +330,13 @@
                 <button id="cancel-reply-btn" onclick="cancelReply()">&times;</button>
             </div>
 
-            <div class="input-wrapper">
+            <div class="input-wrapper" id="chat-input-wrapper" style="display: none;">
                 <input type="text" id="message-input" placeholder="Escreva sua mensagem..." autocomplete="off">
                 <button id="send-btn">Enviar</button>
+            </div>
+
+            <div id="login-prompt" style="display: flex;">
+                <button id="login-btn" class="auth-btn">Fazer Login com Google para Conversar</button>
             </div>
         </div>
     </div>
@@ -320,8 +344,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
         import { getFirestore, collection, addDoc, query, where, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
-        // Suas configurações originais mantidas perfeitamente
         const firebaseConfig = {
             apiKey: "AIzaSyDV3rv4uaKioM6fbAXhJ-YOZ90zapaJ4Js",
             authDomain: "chat-bcfb3.firebaseapp.com",
@@ -331,11 +355,11 @@
             appId: "1:984439378939:web:748d4dbc99abddf16e715e"
         };
 
-        // Inicialização do ecossistema Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
 
-        const myUserId = Math.random().toString(36).substring(2, 9);
         const urlParams = new URLSearchParams(window.location.search);
         let roomId = urlParams.get('room');
 
@@ -349,30 +373,60 @@
         const sendBtn = document.getElementById('send-btn');
         const replyPreviewBar = document.getElementById('reply-preview-bar');
         const replyPreviewText = document.getElementById('reply-preview-text');
+        
+        const loginBtn = document.getElementById('login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const userProfile = document.getElementById('user-profile');
+        const userAvatar = document.getElementById('user-avatar');
+        const userName = document.getElementById('user-name');
+        const chatInputWrapper = document.getElementById('chat-input-wrapper');
+        const loginPrompt = document.getElementById('login-prompt');
 
-        // Estado do mecanismo de resposta ativa
         let activeReplyTarget = null;
+        let currentMessages = [];
 
-        // Escutador de mensagens em tempo real
-        const q = query(collection(db, "messages"), where("roomId", "==", roomId));
-        onSnapshot(q, (snapshot) => {
-            let messages = [];
-            snapshot.forEach((doc) => {
-                // Mapeia adicionando o ID do documento para podermos referenciar em respostas posteriores
-                messages.push({ id: doc.id, ...doc.data() });
-            });
+        // Controle do Estado de Autenticação do Google
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userProfile.style.display = 'flex';
+                userAvatar.src = user.photoURL || '';
+                userName.textContent = user.displayName || 'Usuário';
+                loginPrompt.style.display = 'none';
+                chatInputWrapper.style.display = 'flex';
+            } else {
+                userProfile.style.display = 'none';
+                loginPrompt.style.display = 'flex';
+                chatInputWrapper.style.display = 'none';
+            }
+            renderMessages();
+        });
 
-            messages.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+        loginBtn.addEventListener('click', async () => {
+            try { await signInWithPopup(auth, provider); } catch (e) { console.error(e); }
+        });
 
+        logoutBtn.addEventListener('click', async () => {
+            try { await signOut(auth); } catch (e) { console.error(e); }
+        });
+
+        // Renderizador estruturado de Mensagens
+        function renderMessages() {
             chatBox.innerHTML = '';
-            messages.forEach(msg => {
-                // Wrapper estrutural da mensagem
+            const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+
+            currentMessages.forEach(msg => {
                 const wrapper = document.createElement('div');
                 wrapper.classList.add('wrapper-msg');
-                const isMe = msg.senderId === myUserId;
+                const isMe = msg.senderId === currentUid;
                 wrapper.classList.add(isMe ? 'sent' : 'received');
 
-                // Se a mensagem contiver dados de resposta, injeta o card de citação antes do texto
+                if (!isMe && msg.senderName) {
+                    const nameLabel = document.createElement('span');
+                    nameLabel.style.cssText = "font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px; margin-left: 4px;";
+                    nameLabel.textContent = msg.senderName;
+                    wrapper.appendChild(nameLabel);
+                }
+
                 if (msg.replyTo) {
                     const quoteCard = document.createElement('div');
                     quoteCard.classList.add('reply-quoted-card');
@@ -380,29 +434,34 @@
                     wrapper.appendChild(quoteCard);
                 }
 
-                // O balão de texto principal
                 const bubble = document.createElement('div');
                 bubble.classList.add('msg');
                 bubble.textContent = msg.text;
                 wrapper.appendChild(bubble);
 
-                // Botão flutuante de ação para acionar resposta
-                const replyBtn = document.createElement('button');
-                replyBtn.classList.add('reply-action-btn');
-                replyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>';
-                replyBtn.title = "Responder esta mensagem";
-                replyBtn.addEventListener('click', () => {
-                    initiateReply(msg.text);
-                });
-                wrapper.appendChild(replyBtn);
+                if (currentUid) {
+                    const replyBtn = document.createElement('button');
+                    replyBtn.classList.add('reply-action-btn');
+                    replyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>';
+                    replyBtn.addEventListener('click', () => initiateReply(msg.text));
+                    wrapper.appendChild(replyBtn);
+                }
 
                 chatBox.appendChild(wrapper);
             });
-            
             chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        const q = query(collection(db, "messages"), where("roomId", "==", roomId));
+        onSnapshot(q, (snapshot) => {
+            currentMessages = [];
+            snapshot.forEach((doc) => {
+                currentMessages.push({ id: doc.id, ...doc.data() });
+            });
+            currentMessages.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+            renderMessages();
         });
 
-        // Prepara e abre a interface de resposta
         function initiateReply(text) {
             activeReplyTarget = { text: text };
             replyPreviewText.textContent = `Respondendo: "${text}"`;
@@ -410,33 +469,31 @@
             messageInput.focus();
         }
 
-        // Limpa e fecha o estado de resposta
-        window.cancelReply = function() {
+        // Correção do Escopo das Funções (Ambos funcionam no clique externo e interno)
+        function cancelReply() {
             activeReplyTarget = null;
-            replyPreviewBar.style.style.display = 'none';
+            replyPreviewBar.style.display = 'none';
         }
+        window.cancelReply = cancelReply;
 
-        // Escopo de Envio de Mensagem alterado para suportar o nó 'replyTo'
         async function sendMessage() {
             const text = messageInput.value.trim();
-            if (text === '') return;
+            if (text === '' || !auth.currentUser) return;
 
             messageInput.value = '';
 
-            // Estrutura base do documento Firestore
             const payload = {
                 roomId: roomId,
-                senderId: myUserId,
+                senderId: auth.currentUser.uid,
+                senderName: auth.currentUser.displayName,
+                senderPhoto: auth.currentUser.photoURL,
                 text: text,
                 timestamp: serverTimestamp()
             };
 
-            // Se houver uma resposta ativa, acopla os dados de referência no mesmo documento
             if (activeReplyTarget) {
-                payload.replyTo = {
-                    text: activeReplyTarget.text
-                };
-                cancelReply(); // Reseta a barra após o envio
+                payload.replyTo = { text: activeReplyTarget.text };
+                cancelReply();
             }
 
             try {
@@ -452,8 +509,9 @@
         });
 
         window.copyLink = function() {
-            navigator.clipboard.writeText(window.location.href);
-            alert("Link premium copiado! Envie para quem você deseja conversar nesta sala.");
+            const productionUrl = `https://linuxassistenciadeoperacoes-coder.github.io/chat/?room=${roomId}`;
+            navigator.clipboard.writeText(productionUrl);
+            alert("Link de convite copiado com sucesso!");
         }
     </script>
 </body>
