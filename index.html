@@ -130,6 +130,7 @@
             line-height: 1.4;
             position: relative;
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            z-index: 2;
         }
 
         .wrapper-msg.sent .msg {
@@ -144,21 +145,48 @@
             border-bottom-left-radius: 4px;
         }
 
+        /* ESTILO POP-UP DA RESPOSTA MODIFICADO */
         .reply-quoted-card {
+            position: relative;
             font-size: 0.8rem;
-            padding: 6px 10px;
-            border-radius: 8px;
-            margin-bottom: 6px;
-            border-left: 3px solid var(--primary);
-            background: rgba(0, 0, 0, 0.04);
+            padding: 8px 12px;
+            border-radius: 12px;
+            margin-bottom: 8px; /* Espaço para parecer que está flutuando */
+            background: #ffffff;
+            color: var(--text-main);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
             max-width: 100%;
             word-wrap: break-word;
+            z-index: 1;
         }
+
+        /* Setinha do pop-up apontando para a mensagem */
+        .reply-quoted-card::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: #ffffff transparent transparent transparent;
+        }
+
         .wrapper-msg.sent .reply-quoted-card {
-            background: rgba(255, 255, 255, 0.15);
-            border-left-color: #ffffff;
-            color: #f1f5f9;
+            align-self: flex-end;
         }
+
+        .wrapper-msg.sent .reply-quoted-card::after {
+            right: 20px;
+        }
+
+        .wrapper-msg.received .reply-quoted-card {
+            align-self: flex-start;
+        }
+
+        .wrapper-msg.received .reply-quoted-card::after {
+            left: 20px;
+        }
+        /* FIM DA MODIFICAÇÃO DO POP-UP */
 
         .reply-action-btn {
             position: absolute;
