@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Moderno em Tempo Real</title>
+    <style>
+        :root {
+            --bg-main: #f8fafc;
+            --bg-chat: #ffffff;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --bubble-sent: #6366f1;
+            --bubble-sent-text: #ffffff;
+            --bubble-received: #f1f5f9;
+            --bubble-received-text: #1e293b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            display: flex;
+            justify-center: center;
+            align-items: center;
+            height: 100vh;
+            color: var(--text-main);
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 900px;
+            height: 90vh;
+            background: var(--bg-chat);
+            display: flex;
+            flex-direction: column;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            margin: 20px;
+        }
+
+        /* Topo do Chat */
+        #header {
+            padding: 20px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .room-info h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .room-info p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        #share-btn {
+            background-color: #f1f5f9;
+            color: var(--text-main);
+            border: none;
+            padding: 10px 18px;
+            cursor: pointer;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #share-btn:hover {
+            background-color: #e2e8f0;
+        }
+
+        /* Área de Mensagens */
+        #chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            background-color: #fafafa;
+        }
+
+        /* Scrollbar customizado */
+        #chat-box::-webkit-scrollbar {
+            width: 6px;
+        }
+        #chat-box::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        /* Estrutura do Balão */
+        .wrapper-msg {
+            display: flex;
+            flex-direction: column;
+            max-width: 75%;
+            position: relative;
+            group: hover;
+        }
+
+        .wrapper-msg.sent {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+
+        .wrapper-msg.received {
+            align-self: flex-start;
+            align-items: flex-start;
+        }
+
+        .msg {
+            padding: 12px 18px;
+            border-radius: 18px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .wrapper-msg.sent .msg {
+            background-color: var(--bubble-sent);
+            color: var(--bubble-sent-text);
+            border-bottom-right-radius: 4px;
+        }
+
+        .wrapper-msg.received .msg {
+            background-color: var(--bubble-received);
+            color: var(--bubble-received-text);
+            border-bottom-left-radius: 4px;
+        }
+
+        /* Sub-mecanismo visual de Citação/Resposta dentro do balão */
+        .reply-quoted-card {
+            font-size: 0.8rem;
+            padding: 6px 10px;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            border-left: 3px solid var(--primary);
+            background: rgba(0, 0, 0, 0.04);
+            max-width: 100%;
+            word-wrap: break-word;
+        }
+        .wrapper-msg.sent .reply-quoted-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-left-color: #ffffff;
+            color: #f1f5f9;
+        }
+
+        /* Botão Oculto de Responder (Aparece ao passar o mouse) */
+        .reply-action-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s ease, background 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .wrapper-msg:hover .reply-action-btn {
+            opacity: 1;
+        }
+
+        .wrapper-msg.sent .reply-action-btn {
+            left: -40px;
+        }
+
+        .wrapper-msg.received .reply-action-btn {
+            right: -40px;
+        }
+
+        .reply-action-btn:hover {
+            background: #f8fafc;
+            color: var(--primary);
+        }
+
+        /* Container de Input e Pré-visualização de Resposta */
+        .input-container {
+            border-top: 1px solid #f1f5f9;
+            background: var(--bg-chat);
+            padding: 16px 24px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Barra de visualização de quem está sendo respondido */
+        #reply-preview-bar {
+            display: none;
+            background: #f1f5f9;
+            padding: 8px 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-left: 4px solid var(--primary);
+            animation: fadeIn 0.2s ease;
+        }
+
+        .reply-preview-content {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 85%;
+        }
+
+        #cancel-reply-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        /* Área do Input Real */
+        .input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 14px 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            outline: none;
+            font-size: 0.95rem;
+            background-color: #f8fafc;
+            transition: all 0.2s ease;
+        }
+
+        #message-input:focus {
+            border-color: var(--primary);
+            background-color: #ffffff;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        }
+
+        #send-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            height: 48px;
+            padding: 0 24px;
+            border-radius: 16px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: background 0.2s ease;
+        }
+
+        #send-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <div id="header">
+            <div class="room-info">
+                <h2>Sala de Conversa</h2>
+                <p>Criptografada via ID de Sessão</p>
+            </div>
+            <button id="share-btn" onclick="copyLink()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                Convidar Alguém
+            </button>
+        </div>
+
+        <div id="chat-box"></div>
+
+        <div class="input-container">
+            <div id="reply-preview-bar">
+                <div class="reply-preview-content" id="reply-preview-text">
+                    Respondendo...
+                </div>
+                <button id="cancel-reply-btn" onclick="cancelReply()">&times;</button>
+            </div>
+
+            <div class="input-wrapper">
+                <input type="text" id="message-input" placeholder="Escreva sua mensagem..." autocomplete="off">
+                <button id="send-btn">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, where, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+        // Suas configurações originais mantidas perfeitamente
+        const firebaseConfig = {
+            apiKey: "AIzaSyDV3rv4uaKioM6fbAXhJ-YOZ90zapaJ4Js",
+            authDomain: "chat-bcfb3.firebaseapp.com",
+            projectId: "chat-bcfb3",
+            storageBucket: "chat-bcfb3.firebasestorage.app",
+            messagingSenderId: "984439378939",
+            appId: "1:984439378939:web:748d4dbc99abddf16e715e"
+        };
+
+        // Inicialização do ecossistema Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const myUserId = Math.random().toString(36).substring(2, 9);
+        const urlParams = new URLSearchParams(window.location.search);
+        let roomId = urlParams.get('room');
+
+        if (!roomId) {
+            roomId = Math.random().toString(36).substring(2, 9);
+            window.history.pushState({}, '', `?room=${roomId}`);
+        }
+
+        const chatBox = document.getElementById('chat-box');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const replyPreviewBar = document.getElementById('reply-preview-bar');
+        const replyPreviewText = document.getElementById('reply-preview-text');
+
+        // Estado do mecanismo de resposta ativa
+        let activeReplyTarget = null;
+
+        // Escutador de mensagens em tempo real
+        const q = query(collection(db, "messages"), where("roomId", "==", roomId));
+        onSnapshot(q, (snapshot) => {
+            let messages = [];
+            snapshot.forEach((doc) => {
+                // Mapeia adicionando o ID do documento para podermos referenciar em respostas posteriores
+                messages.push({ id: doc.id, ...doc.data() });
+            });
+
+            messages.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+
+            chatBox.innerHTML = '';
+            messages.forEach(msg => {
+                // Wrapper estrutural da mensagem
+                const wrapper = document.createElement('div');
+                wrapper.classList.add('wrapper-msg');
+                const isMe = msg.senderId === myUserId;
+                wrapper.classList.add(isMe ? 'sent' : 'received');
+
+                // Se a mensagem contiver dados de resposta, injeta o card de citação antes do texto
+                if (msg.replyTo) {
+                    const quoteCard = document.createElement('div');
+                    quoteCard.classList.add('reply-quoted-card');
+                    quoteCard.textContent = msg.replyTo.text;
+                    wrapper.appendChild(quoteCard);
+                }
+
+                // O balão de texto principal
+                const bubble = document.createElement('div');
+                bubble.classList.add('msg');
+                bubble.textContent = msg.text;
+                wrapper.appendChild(bubble);
+
+                // Botão flutuante de ação para acionar resposta
+                const replyBtn = document.createElement('button');
+                replyBtn.classList.add('reply-action-btn');
+                replyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>';
+                replyBtn.title = "Responder esta mensagem";
+                replyBtn.addEventListener('click', () => {
+                    initiateReply(msg.text);
+                });
+                wrapper.appendChild(replyBtn);
+
+                chatBox.appendChild(wrapper);
+            });
+            
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+
+        // Prepara e abre a interface de resposta
+        function initiateReply(text) {
+            activeReplyTarget = { text: text };
+            replyPreviewText.textContent = `Respondendo: "${text}"`;
+            replyPreviewBar.style.display = 'flex';
+            messageInput.focus();
+        }
+
+        // Limpa e fecha o estado de resposta
+        window.cancelReply = function() {
+            activeReplyTarget = null;
+            replyPreviewBar.style.style.display = 'none';
+        }
+
+        // Escopo de Envio de Mensagem alterado para suportar o nó 'replyTo'
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (text === '') return;
+
+            messageInput.value = '';
+
+            // Estrutura base do documento Firestore
+            const payload = {
+                roomId: roomId,
+                senderId: myUserId,
+                text: text,
+                timestamp: serverTimestamp()
+            };
+
+            // Se houver uma resposta ativa, acopla os dados de referência no mesmo documento
+            if (activeReplyTarget) {
+                payload.replyTo = {
+                    text: activeReplyTarget.text
+                };
+                cancelReply(); // Reseta a barra após o envio
+            }
+
+            try {
+                await addDoc(collection(db, "messages"), payload);
+            } catch (e) {
+                console.error("Erro ao registrar dados no Firestore: ", e);
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        window.copyLink = function() {
+            navigator.clipboard.writeText(window.location.href);
+            alert("Link premium copiado! Envie para quem você deseja conversar nesta sala.");
+        }
+    </script>
+</body>
+</html>
