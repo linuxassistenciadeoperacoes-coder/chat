@@ -412,6 +412,27 @@
 
         let activeReplyTarget = null;
         let currentMessages = [];
+        let isInitialLoad = true;
+
+        // Função nativa para emitir notificação sonora sem arquivos externos
+        function playNotificationSound() {
+            try {
+                const context = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = context.createOscillator();
+                const gain = context.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, context.currentTime); // Nota Re5
+                osc.frequency.setValueAtTime(880, context.currentTime + 0.08); // Nota La5
+                gain.gain.setValueAtTime(0.06, context.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.35);
+                osc.connect(gain);
+                gain.connect(context.destination);
+                osc.start();
+                osc.stop(context.currentTime + 0.35);
+            } catch (e) {
+                console.error("Erro ao emitir som de notificação:", e);
+            }
+        }
 
         // Controle do Estado de Autenticação do Google
         onAuthStateChanged(auth, (user) => {
@@ -482,11 +503,23 @@
 
         const q = query(collection(db, "messages"), where("roomId", "==", roomId));
         onSnapshot(q, (snapshot) => {
-            currentMessages = [];
+            const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+            const newMessages = [];
             snapshot.forEach((doc) => {
-                currentMessages.push({ id: doc.id, ...doc.data() });
+                newMessages.push({ id: doc.id, ...doc.data() });
             });
-            currentMessages.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+            newMessages.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+            
+            // Verifica se chegaram novas mensagens de outro usuário após o carregamento inicial
+            if (!isInitialLoad && newMessages.length > currentMessages.length) {
+                const lastMessage = newMessages[newMessages.length - 1];
+                if (lastMessage && lastMessage.senderId !== currentUid) {
+                    playNotificationSound();
+                }
+            }
+
+            currentMessages = newMessages;
+            isInitialLoad = false;
             renderMessages();
         });
 
