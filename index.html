@@ -413,6 +413,7 @@
         let activeReplyTarget = null;
         let currentMessages = [];
         let isInitialLoad = true;
+        let unreadCount = 0;
 
         // Função nativa para emitir notificação sonora sem arquivos externos
         function playNotificationSound() {
@@ -515,12 +516,26 @@
                 const lastMessage = newMessages[newMessages.length - 1];
                 if (lastMessage && lastMessage.senderId !== currentUid) {
                     playNotificationSound();
+                    
+                    // Incrementa o contador de abas se o usuário estiver fora da página
+                    if (document.hidden) {
+                        unreadCount += (newMessages.length - currentMessages.length);
+                        document.title = `(${unreadCount}) Chat Moderno em Tempo Real`;
+                    }
                 }
             }
 
             currentMessages = newMessages;
             isInitialLoad = false;
             renderMessages();
+        });
+
+        // Evento que detecta quando o usuário retorna à aba para zerar o contador do título
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                unreadCount = 0;
+                document.title = 'Chat Moderno em Tempo Real';
+            }
         });
 
         function initiateReply(text) {
